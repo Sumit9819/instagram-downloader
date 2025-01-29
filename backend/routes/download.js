@@ -1,21 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const { validateUrl, fetchMedia } = require('../utils/instagram');
+const instagram = require('../utils/instagram');
+const { rateLimiter } = require('../middleware/rateLimit');
 
-router.post('/', async (req, res) => {
+router.post('/', rateLimiter, async (req, res, next) => {
   try {
     const { url } = req.body;
-    
-    if (!validateUrl(url)) {
-      return res.status(400).json({ error: "Invalid Instagram URL" });
+    if (!url) {
+      return res.status(400).json({ error: 'URL is required' });
     }
 
-    const mediaUrls = await fetchMedia(url);
-    res.json({ mediaUrls });
-    
+    const mediaId = instagram.extractMediaIdFromUrl(url);
+    if (!mediaId) {
+      return res.status(400).json({ error: 'Invalid Instagram URL' });
+    }
+
+    const mediaInfo = await instagram.getMediaInfo(mediaId);
+    res.json({ mediaUrls: [mediaInfo] });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch media" });
+    next(error);
   }
 });
 
